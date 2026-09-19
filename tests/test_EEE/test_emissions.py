@@ -464,6 +464,7 @@ def test_emissions_estimator_init_region_code_fallback(mocker: MockerFixture) ->
     }.get(key)
 
     estimator_bra = EmissionsEstimator(False, False, False, False)
+    assert estimator_bra.country == "BRA"
     assert estimator_bra._get_feed_emissions_data.call_args_list[0][0][0] == 3106200
 
     # Case B: legacy FIPS_county_code provided
@@ -476,6 +477,7 @@ def test_emissions_estimator_init_region_code_fallback(mocker: MockerFixture) ->
     }.get(key)
 
     estimator_legacy = EmissionsEstimator(False, False, False, False)
+    assert estimator_legacy.country == "USA"
     assert estimator_legacy._get_feed_emissions_data.call_args_list[2][0][0] == 55025
 
 

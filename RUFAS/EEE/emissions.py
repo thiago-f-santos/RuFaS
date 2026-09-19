@@ -138,7 +138,7 @@ class EmissionsEstimator:
         self.simulate_fields = simulate_fields
         self.simulate_manure = simulate_manure
 
-        country = self.im.get_data("config.country", required=False) or "USA"
+        self.country = self.im.get_data("config.country", required=False) or "USA"
         region_code = self.im.get_data("config.region_code", required=False)
         if region_code is None:
             region_code = self.im.get_data("config.FIPS_county_code", required=False)
@@ -288,7 +288,8 @@ class EmissionsEstimator:
             }
             self.om.add_error(
                 "Invalid country code access.",
-                f"Emission data have {code_column_key}s {region_codes}," f"Tried to get data with {code_column_key}: {region_code}",
+                f"Emission data have {code_column_key}s {region_codes},"
+                f"Tried to get data with {code_column_key}: {region_code}",
                 info_map,
             )
             raise
