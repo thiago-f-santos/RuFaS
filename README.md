@@ -10,6 +10,20 @@
 
 ---
 
+### 🌿 Fork Rationale: RuFaS Brasil (Southern Hemisphere & National Regionalization)
+
+- **Fork Rationale:** This fork adapts RuFaS for tropical and subtropical dairy production systems in Brazil and the Southern Hemisphere. It enables realistic astronomical photoperiods for negative latitudes and modularizes regional identification using official IBGE codes.
+- **Lineage:** Forked from upstream RuFaS v1.0.5 (`dev` branch, commit `717f47203d3a881eaa29fb8b0c5bb7a27deb79e1`).
+- **Material Deviations:**
+  1. *Signed Latitude & Photoperiod:* Supports negative latitudes (`latitude` in `field_properties`) so that solar declination daylength correctly models summer in Dec–Feb and winter in Jun–Aug. Maintains bidirectional synchronization with `absolute_latitude`.
+  2. *Regional Modularization:* Adds `country` (ISO 3-letter code) and `region_code` to `config_properties`. Generalizes purchased feed emissions lookup and Wood lactation curve state mapping with support for 2-digit UF and 7-digit municipality IBGE codes, with neutral additive fallback (`{"l": 0.0, "m": 0.0, "n": 0.0}`).
+  3. *Zero-breakage Backward Compatibility:* Retains full compatibility with legacy US scenarios (`FIPS_county_code`, `absolute_latitude`).
+- **Comparability Note:** Simulation results for US scenarios (`country: "USA"` or legacy configs) remain 100% identical and directly comparable to upstream RuFaS. For Brazilian and Southern Hemisphere scenarios, crop phenology and photoperiod-driven processes reflect the real Southern Hemisphere calendar, meaning seasonal timing intentionally diverges by 6 months from unpatched upstream simulations.
+- **Documentation:** See the [Guia de Uso do RuFaS Brasil](docs/usage_brasil.md) for full configuration instructions and examples.
+- **Disclaimer:** This fork is an independent research adaptation and does not imply official endorsement by the upstream RuFaS project.
+
+---
+
 ### 🌍 Vision
 
 A world where the continuous generation and sharing of knowledge about ruminant production systems [^note] empower understanding and decision making to achieve socio-economic well-being and environmental sustainability.
