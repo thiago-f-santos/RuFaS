@@ -422,6 +422,7 @@ class LactationCurve:
         Calculate the absolute difference between Wood's-curve-predicted 305-day milk yield
         and a target yield. Used as the objective in fitting Wood's l parameter.
         """
+        l_param = float(l_param[0]) if hasattr(l_param, "__len__") else float(l_param)
         return abs(MilkProduction.calculate_predicted_305_day_milk_yield(l_param, m_param, n_param) - milk_yield)
 
     @classmethod
