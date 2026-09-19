@@ -14,6 +14,8 @@ class FieldData:
     ----------
     name : str, optional
         Name of this field for identification purposes.
+    latitude : float, optional
+        The latitude value of where the field is located (degrees). Positive for Northern Hemisphere, negative for Southern Hemisphere.
     absolute_latitude : float, default=43.5
         The absolute latitude value (degrees above or below equator) where field is located (degrees).
     longitude : float, default=-88.6
@@ -68,6 +70,7 @@ class FieldData:
     """
 
     name: str | None = None
+    latitude: float | None = None
     absolute_latitude: float = 43.5
     longitude: float = -88.6
     minimum_daylength: float = 6.33
@@ -107,6 +110,11 @@ class FieldData:
             If the watering amount is < 0.
             If the watering interval is < 0.
         """
+        if self.latitude is None:
+            self.latitude = self.absolute_latitude
+        else:
+            self.absolute_latitude = abs(self.latitude)
+
         self.dormancy_threshold = Dormancy.find_dormancy_threshold(self.absolute_latitude)
         self.dormancy_threshold_daylength = Dormancy.find_threshold_daylength(
             self.minimum_daylength, self.dormancy_threshold

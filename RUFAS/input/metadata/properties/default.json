@@ -25,6 +25,17 @@
       "pattern": "^(NASEM|NRC)$",
       "description": "The nutrient standard to use for feed."
     },
+    "country": {
+      "type": "string",
+      "description": "Three-letter country ISO code for the simulation location (e.g. 'USA', 'BRA').",
+      "pattern": "^[A-Z]{3}$",
+      "default": "USA"
+    },
+    "region_code": {
+      "type": "number",
+      "description": "Administrative region code (e.g. 5-digit FIPS for USA, 2-digit UF or 7-digit municipality IBGE code for Brazil).",
+      "minimum": 1
+    },
     "FIPS_county_code": {
       "type": "number",
       "minimum": 1000,
@@ -6026,6 +6037,13 @@
       "type": "number",
       "description": "Size of the field.",
       "minimum": 0.0
+    },
+    "latitude": {
+      "type": "number",
+      "description": "The geographic latitude of the center of this field (degrees, negative for Southern Hemisphere).\nUnits: degrees.",
+      "minimum": -90.0,
+      "maximum": 90.0,
+      "default": 43.5
     },
     "absolute_latitude": {
       "type": "number",

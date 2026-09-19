@@ -1,6 +1,7 @@
 from typing import Any
 from warnings import catch_warnings
 
+import numpy as np
 from scipy.optimize import minimize
 
 from RUFAS.biophysical.animal.milk.milk_production import MilkProduction
@@ -87,10 +88,16 @@ class LactationCurve:
         all_year_adjustments: dict[str, dict[str, float]] = lactation_inputs["adjustments"]["year"]
         year_adjustments = cls._get_year_adjustments(all_year_adjustments, time)
 
-        fips_code: int = im.get_data("config.FIPS_county_code")
+        country = im.get_data("config.country", required=False) or "USA"
+        region_code = im.get_data("config.region_code", required=False)
+        if region_code is None:
+            region_code = im.get_data("config.FIPS_county_code", required=False)
+
         all_region_adjustments: dict[str, dict[str, float]] = lactation_inputs["adjustments"]["region"]
-        region_mapping: dict[str, str] = lactation_inputs["state_to_region_mapping"]
-        region_adjustments = cls._get_region_adjustments(all_region_adjustments, region_mapping, fips_code)
+        region_mapping: dict[str, str] = lactation_inputs.get("state_to_region_mapping", {})
+        region_adjustments = cls._get_region_adjustments(
+            all_region_adjustments, region_mapping, region_code, country
+        )
 
         animal_inputs: dict[str, Any] = im.get_data("animal")
         animal_milking_frequency: float = animal_inputs["animal_config"]["management_decisions"][
@@ -166,14 +173,51 @@ class LactationCurve:
 
     @classmethod
     def _get_region_adjustments(
-        cls, region_adjustment_values: dict[str, dict[str, float]], region_mapping: dict[str, str], fips_code: int
+        cls,
+        region_adjustment_values: dict[str, dict[str, float]],
+        region_mapping: dict[str, str],
+        region_code: int | None,
+        country: str = "USA",
     ) -> dict[str, float]:
-        """Retrieves the appropriate adjustment values for the region being simulated."""
-        state_fips_code = int(fips_code / 1000)
+        """
+        Retrieves the appropriate adjustment values for the region being simulated.
 
-        region = region_mapping[str(state_fips_code)]
+        Parameters
+        ----------
+        region_adjustment_values : dict[str, dict[str, float]]
+            Mapping of region names to Wood curve parameter adjustments (l, m, n).
+        region_mapping : dict[str, str]
+            Mapping of state or UF codes to region names.
+        region_code : int | None
+            Administrative region code (FIPS county code or IBGE municipality/state code).
+        country : str, default="USA"
+            Three-letter ISO country code.
 
-        return region_adjustment_values[region]
+        Returns
+        -------
+        dict[str, float]
+            Additive Wood parameter adjustments {"l": float, "m": float, "n": float}.
+        """
+        neutral_adjustments = {"l": 0.0, "m": 0.0, "n": 0.0}
+        if region_code is None:
+            return neutral_adjustments
+
+        country_code = country.upper() if country else "USA"
+        if country_code == "USA":
+            state_fips_code = int(region_code / 1000)
+            region = region_mapping.get(str(state_fips_code))
+            if region and region in region_adjustment_values:
+                return region_adjustment_values[region]
+            return neutral_adjustments
+        elif country_code == "BRA":
+            code_str = str(region_code)
+            state_ibge_code = int(code_str[:2]) if len(code_str) >= 2 else region_code
+            region = region_mapping.get(str(state_ibge_code))
+            if region and region in region_adjustment_values:
+                return region_adjustment_values[region]
+            return neutral_adjustments
+        else:
+            return neutral_adjustments
 
     @classmethod
     def _get_milking_frequency_adjustments(
@@ -380,6 +424,7 @@ class LactationCurve:
         Calculate the absolute difference between Wood's-curve-predicted 305-day milk yield
         and a target yield. Used as the objective in fitting Wood's l parameter.
         """
+        l_param = float(np.asarray(l_param).item())
         return abs(MilkProduction.calculate_predicted_305_day_milk_yield(l_param, m_param, n_param) - milk_yield)
 
     @classmethod

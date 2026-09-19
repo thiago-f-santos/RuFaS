@@ -138,16 +138,19 @@ class EmissionsEstimator:
         self.simulate_fields = simulate_fields
         self.simulate_manure = simulate_manure
 
-        county_code = self.im.get_data("config.FIPS_county_code")
+        self.country = self.im.get_data("config.country", required=False) or "USA"
+        region_code = self.im.get_data("config.region_code", required=False)
+        if region_code is None:
+            region_code = self.im.get_data("config.FIPS_county_code", required=False)
 
         purchased_feed_emissions_data = self.im.get_data("purchased_feeds_emissions")
         self.purchased_feed_emissions_by_location = self._get_feed_emissions_data(
-            county_code, purchased_feed_emissions_data
+            region_code, purchased_feed_emissions_data
         )
 
         land_use_change_emissions_data = self.im.get_data("purchased_feed_land_use_change_emissions")
         self.land_use_change_emissions_by_location = self._get_feed_emissions_data(
-            county_code, land_use_change_emissions_data
+            region_code, land_use_change_emissions_data
         )
         self._missing_purchased_ids: set[str] = set()
         self._missing_land_use_ids: set[str] = set()
@@ -251,32 +254,33 @@ class EmissionsEstimator:
         self.om.add_variable("land_use_change_emissions", land_use_change_emissions, info_map)
 
     def _get_feed_emissions_data(
-        self, county_code: int, feed_emissions_data: dict[str, list[float]]
+        self, region_code: int, feed_emissions_data: dict[str, list[float]]
     ) -> dict[str, float]:
         """
         Grabs the appropriate emissions factors for purchased feeds for the location of the simulation.
 
         Parameters
         ----------
-        county_code : int
-            The FIPS county code of the simulation location.
+        region_code : int
+            The administrative region code (FIPS county code or IBGE code) of the simulation location.
         feed_emissions_data : dict[str, list[float]]
-            A mapping of RuFaS feed IDs to their emissions factors per county, including a ``"county_code"`` key
-            listing the county codes in the same order as the factors.
+            A mapping of RuFaS feed IDs to their emissions factors per region, including a ``"region_code"``
+            or ``"county_code"`` key listing the codes in the same order as the factors.
 
         Returns
         -------
         dict[str, float]
-            A mapping of RuFaS feed IDs to their emissions factors for the simulation's county.
+            A mapping of RuFaS feed IDs to their emissions factors for the simulation's region.
 
         Raises
         ------
         ValueError
-            If the simulation's county code is not present in ``feed_emissions_data``.
+            If the simulation's region code is not present in ``feed_emissions_data``.
         """
-        county_codes = feed_emissions_data["county_code"]
+        code_column_key = "region_code" if "region_code" in feed_emissions_data else "county_code"
+        region_codes = feed_emissions_data[code_column_key]
         try:
-            emissions_index = county_codes.index(county_code)
+            emissions_index = region_codes.index(region_code)
         except ValueError:
             info_map = {
                 "class": self.__class__.__name__,
@@ -284,12 +288,13 @@ class EmissionsEstimator:
             }
             self.om.add_error(
                 "Invalid country code access.",
-                f"Emission data have county codes {county_codes}," f"Tried to get data with county code: {county_code}",
+                f"Emission data have {code_column_key}s {region_codes},"
+                f"Tried to get data with {code_column_key}: {region_code}",
                 info_map,
             )
             raise
 
-        feed_keys = [key for key in feed_emissions_data.keys() if key != "county_code"]
+        feed_keys = [key for key in feed_emissions_data.keys() if key != code_column_key]
         feed_emissions_dict = {key: feed_emissions_data[key][emissions_index] for key in feed_keys}
 
         return feed_emissions_dict

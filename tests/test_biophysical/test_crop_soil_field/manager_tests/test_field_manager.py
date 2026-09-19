@@ -193,6 +193,61 @@ def test_daily_update_routine(
     assert len(actual) == expected_harvests_count
 
 
+def test_setup_field_data_signed_latitude():
+    """Tests that _setup_field_data properly parses signed latitude with fallback."""
+    config_southern = {
+        "field_size": 2.0,
+        "latitude": -22.5,
+        "longitude": -45.0,
+        "minimum_daylength": 10.5,
+        "seasonal_high_water_table": False,
+        "watering_amount_in_liters": 0.0,
+        "watering_interval": 0,
+        "simulate_water_stress": True,
+        "simulate_temp_stress": True,
+        "simulate_nitrogen_stress": True,
+        "simulate_phosphorus_stress": True,
+    }
+    field_data = FieldManager._setup_field_data("south_field", config_southern)
+    assert field_data.latitude == -22.5
+    assert field_data.absolute_latitude == 22.5
+
+    config_legacy = {
+        "field_size": 2.0,
+        "absolute_latitude": 43.5,
+        "longitude": -89.4,
+        "minimum_daylength": 9.0,
+        "seasonal_high_water_table": False,
+        "watering_amount_in_liters": 0.0,
+        "watering_interval": 0,
+        "simulate_water_stress": True,
+        "simulate_temp_stress": True,
+        "simulate_nitrogen_stress": True,
+        "simulate_phosphorus_stress": True,
+    }
+    legacy_data = FieldManager._setup_field_data("legacy_field", config_legacy)
+    assert legacy_data.latitude == 43.5
+    assert legacy_data.absolute_latitude == 43.5
+
+
+def test_daily_update_routine_passes_signed_latitude(mocker: MockerFixture):
+    """Tests that daily_update_routine passes field_data.latitude (signed) to weather."""
+    mock_weather = mocker.MagicMock()
+    mock_time = mocker.MagicMock()
+    mock_crop_factory = mocker.patch("RUFAS.biophysical.field.manager.field_manager.CropDataFactory")
+    mock_crop_factory.setup_crop_configurations.return_value = None
+    mock_crop_factory.get_available_crop_configurations.return_value = []
+
+    fm = FieldManager({})
+    field = mocker.MagicMock()
+    field.field_data = FieldData(name="brazil_field", latitude=-22.5)
+    field.manage_field.return_value = []
+    fm.fields = [field]
+
+    fm.daily_update_routine(weather=mock_weather, time=mock_time, manure_applications=[])
+    mock_weather.get_current_day_conditions.assert_called_once_with(mock_time, -22.5)
+
+
 @pytest.mark.parametrize(
     "fields",
     [

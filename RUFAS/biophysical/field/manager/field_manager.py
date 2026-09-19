@@ -91,7 +91,7 @@ class FieldManager:
         """
         harvested_crops: list[HarvestedCrop] = []
         for field in self.fields:
-            current_conditions = weather.get_current_day_conditions(time, field.field_data.absolute_latitude)
+            current_conditions = weather.get_current_day_conditions(time, field.field_data.latitude)
             info_map = {
                 "class": self.__class__.__name__,
                 "function": self.daily_update_routine.__name__,
@@ -222,10 +222,21 @@ class FieldManager:
             An instance of the FieldData class populated with the values from the field_configuration_data.
 
         """
+        latitude = field_configuration_data.get("latitude")
+        absolute_latitude = field_configuration_data.get("absolute_latitude")
+        if latitude is None and absolute_latitude is None:
+            latitude = 43.5
+            absolute_latitude = 43.5
+        elif latitude is None:
+            latitude = absolute_latitude
+        elif absolute_latitude is None:
+            absolute_latitude = abs(latitude)
+
         return FieldData(
             name=field_name,
             field_size=field_configuration_data["field_size"],
-            absolute_latitude=field_configuration_data["absolute_latitude"],
+            latitude=latitude,
+            absolute_latitude=absolute_latitude,
             longitude=field_configuration_data["longitude"],
             minimum_daylength=field_configuration_data["minimum_daylength"],
             seasonal_high_water_table=field_configuration_data["seasonal_high_water_table"],

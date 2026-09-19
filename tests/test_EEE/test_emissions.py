@@ -163,7 +163,9 @@ def test_emissions_estimator_init(mocker: MockerFixture) -> None:
         "emissions": [{"50": 0.1, "51": 0.2, "52": 0.3}],
     }
 
-    def get_data_side_effect(key: str) -> Any:
+    def get_data_side_effect(key: str, required: bool = True) -> Any:
+        if key in ("config.country", "config.region_code"):
+            return None
         if key == "config.FIPS_county_code":
             return county_code
         if key == "purchased_feeds_emissions":
@@ -205,7 +207,9 @@ def test_emissions_estimator_init_without_feed_storage_data(mocker: MockerFixtur
         side_effect=[{"50": 1.0}, {"50": 0.1}],
     )
 
-    def get_data_side_effect(key: str) -> Any:
+    def get_data_side_effect(key: str, required: bool = True) -> Any:
+        if key in ("config.country", "config.region_code"):
+            return None
         if key == "config.FIPS_county_code":
             return county_code
         if key == "purchased_feeds_emissions":
@@ -413,9 +417,68 @@ def test_get_feed_emissions_data_invalid_county_code(
     except ValueError:
         mock_add_error.assert_called_once_with(
             "Invalid country code access.",
-            "Emission data have county codes [53705, 94545]," "Tried to get data with county code: 53706",
+            "Emission data have county_codes [53705, 94545]," "Tried to get data with county_code: 53706",
             {"class": "EmissionsEstimator", "function": "_get_feed_emissions_data"},
         )
+
+
+def test_get_feed_emissions_data_invalid_region_code(mocker: MockerFixture, em: EmissionsEstimator) -> None:
+    """Tests errors were handled when trying to access invalid region code."""
+    mock_add_error = mocker.patch.object(em.om, "add_error")
+    feed_data = {"region_code": [3106200, 3550308], "data1": [1.5, 2.5]}
+    try:
+        em._get_feed_emissions_data(9999999, feed_data)
+    except ValueError:
+        mock_add_error.assert_called_once_with(
+            "Invalid country code access.",
+            "Emission data have region_codes [3106200, 3550308]," "Tried to get data with region_code: 9999999",
+            {"class": "EmissionsEstimator", "function": "_get_feed_emissions_data"},
+        )
+
+
+def test_get_feed_emissions_data_with_region_code(em: EmissionsEstimator) -> None:
+    """Tests that _get_feed_emissions_data supports region_code as well as county_code."""
+    feed_data_brazil = {
+        "region_code": [3106200, 3550308],
+        "data1": [1.5, 2.5],
+        "data2": [10.0, 20.0],
+    }
+    result = em._get_feed_emissions_data(3106200, feed_data_brazil)
+    assert result == {"data1": 1.5, "data2": 10.0}
+
+
+def test_emissions_estimator_init_region_code_fallback(mocker: MockerFixture) -> None:
+    """Tests that EmissionsEstimator resolves region_code from config.region_code or fallback to config.FIPS_county_code."""
+    mock_im = mocker.MagicMock()
+    mocker.patch("RUFAS.EEE.emissions.InputManager", return_value=mock_im)
+    mocker.patch("RUFAS.EEE.emissions.OutputManager")
+    mocker.patch.object(EmissionsEstimator, "_get_feed_emissions_data", return_value={})
+
+    # Case A: region_code provided
+    mock_im.get_data.side_effect = lambda key, required=True: {
+        "config.country": "BRA",
+        "config.region_code": 3106200,
+        "config.FIPS_county_code": None,
+        "purchased_feeds_emissions": {},
+        "purchased_feed_land_use_change_emissions": {},
+    }.get(key)
+
+    estimator_bra = EmissionsEstimator(False, False, False, False)
+    assert estimator_bra.country == "BRA"
+    assert estimator_bra._get_feed_emissions_data.call_args_list[0][0][0] == 3106200
+
+    # Case B: legacy FIPS_county_code provided
+    mock_im.get_data.side_effect = lambda key, required=True: {
+        "config.country": None,
+        "config.region_code": None,
+        "config.FIPS_county_code": 55025,
+        "purchased_feeds_emissions": {},
+        "purchased_feed_land_use_change_emissions": {},
+    }.get(key)
+
+    estimator_legacy = EmissionsEstimator(False, False, False, False)
+    assert estimator_legacy.country == "USA"
+    assert estimator_legacy._get_feed_emissions_data.call_args_list[2][0][0] == 55025
 
 
 def test_parse_farmgrown_feeds_emission_data(

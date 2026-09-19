@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Any
 
+import numpy as np
 import pytest
 from pytest_mock import MockerFixture
 
@@ -163,7 +164,16 @@ def test_set_lactation_curve(
     mock_time = mocker.MagicMock()
     animal_inputs["herd_information"]["annual_milk_yield"] = annual_milk_yield
     im = InputManager()
-    get_data = mocker.patch.object(im, "get_data", side_effect=[lactation_inputs, 55025, animal_inputs])
+    get_data_responses = {
+        "lactation": lactation_inputs,
+        "config.country": "USA",
+        "config.region_code": None,
+        "config.FIPS_county_code": 55025,
+        "animal": animal_inputs,
+    }
+    get_data = mocker.patch.object(
+        im, "get_data", side_effect=lambda key, required=True: get_data_responses.get(key)
+    )
     om = OutputManager()
     add_log = mocker.patch.object(om, "add_log")
     add_var = mocker.patch.object(om, "add_variable")
@@ -185,7 +195,7 @@ def test_set_lactation_curve(
 
     LactationCurve.set_lactation_parameters(mock_time)
 
-    assert get_data.call_count == 3
+    assert get_data.call_count == 5
     year_adjustments.assert_called_once()
     region_adjustments.assert_called_once()
     milking_freq.assert_called_once()
@@ -259,6 +269,87 @@ def test_get_region_adjustments(lactation_inputs: dict[str, Any], fips_code: int
     actual = LactationCurve._get_region_adjustments(all_region_adjustments, region_mapping, fips_code)
 
     assert actual == expected
+
+
+def test_get_region_adjustments_brazil(lactation_inputs: dict[str, Any]) -> None:
+    """Test region adjustments for Brazilian IBGE codes with neutral fallback and region mapping."""
+    all_region_adjustments = {
+        "southeast": {"l": 0.5, "m": -0.2, "n": -0.1},
+    }
+    brazil_mapping = {
+        "31": "southeast",  # Minas Gerais
+        "35": "southeast",  # São Paulo
+    }
+
+    # Case 1: 7-digit municipality code for MG (Coronel Pacheco: 3120508)
+    adj_mg = LactationCurve._get_region_adjustments(
+        all_region_adjustments, brazil_mapping, 3120508, country="BRA"
+    )
+    assert adj_mg == {"l": 0.5, "m": -0.2, "n": -0.1}
+
+    # Case 2: 2-digit state code for SP (35)
+    adj_sp = LactationCurve._get_region_adjustments(
+        all_region_adjustments, brazil_mapping, 35, country="BRA"
+    )
+    assert adj_sp == {"l": 0.5, "m": -0.2, "n": -0.1}
+
+    # Case 3: Unmapped state code -> neutral adjustments
+    adj_unknown = LactationCurve._get_region_adjustments(
+        all_region_adjustments, brazil_mapping, 12, country="BRA"
+    )
+    assert adj_unknown == {"l": 0.0, "m": 0.0, "n": 0.0}
+
+    # Case 4: None region_code -> neutral adjustments
+    adj_none = LactationCurve._get_region_adjustments(
+        all_region_adjustments, brazil_mapping, None, country="BRA"
+    )
+    assert adj_none == {"l": 0.0, "m": 0.0, "n": 0.0}
+
+
+def test_set_lactation_parameters_region_code_fallback(mocker: MockerFixture) -> None:
+    """Tests set_lactation_parameters reads country and region_code with fallback to FIPS_county_code."""
+    mock_im = mocker.patch("RUFAS.biophysical.animal.milk.lactation_curve.InputManager").return_value
+    mock_time = mocker.MagicMock()
+    mock_time.end_date.year = 2024
+
+    mock_lactation_inputs = {
+        "adjustments": {
+            "year": {"2016": {"l": 0.0, "m": 0.0, "n": 0.0}, "2024": {"l": 0.0, "m": 0.0, "n": 0.0}},
+            "region": {"southeast": {"l": 0.5, "m": -0.2, "n": -0.1}},
+            "milking_frequency": {"twice_daily": {"l": 0.0, "m": 0.0, "n": 0.0}},
+            "parity": {"1": {"l": 0.0, "m": 0.0, "n": 0.0}},
+        },
+        "state_to_region_mapping": {"31": "southeast"},
+        "parameter_mean_values": {"parameter_l_mean": 10.0, "parameter_m_mean": 0.2, "parameter_n_mean": 0.05},
+        "parameter_standard_deviations": {
+            "1": {"parameter_l_std_dev": 0.1, "parameter_m_std_dev": 0.01, "parameter_n_std_dev": 0.001},
+            "2": {"parameter_l_std_dev": 0.1, "parameter_m_std_dev": 0.01, "parameter_n_std_dev": 0.001},
+            "3": {"parameter_l_std_dev": 0.1, "parameter_m_std_dev": 0.01, "parameter_n_std_dev": 0.001},
+        },
+    }
+    mock_animal_inputs = {
+        "animal_config": {"management_decisions": {"cow_times_milked_per_day": 2.0}},
+        "herd_information": {"annual_milk_yield": None},
+    }
+
+    mock_im.get_data.side_effect = lambda key, required=True: {
+        "lactation": mock_lactation_inputs,
+        "config.country": "BRA",
+        "config.region_code": 3120508,
+        "config.FIPS_county_code": None,
+        "animal": mock_animal_inputs,
+    }.get(key)
+
+    mock_get_adj = mocker.patch.object(
+        LactationCurve, "_get_region_adjustments", wraps=LactationCurve._get_region_adjustments
+    )
+    LactationCurve.set_lactation_parameters(mock_time)
+    mock_get_adj.assert_called_once_with(
+        mock_lactation_inputs["adjustments"]["region"],
+        mock_lactation_inputs["state_to_region_mapping"],
+        3120508,
+        "BRA",
+    )
 
 
 @pytest.mark.parametrize(
@@ -452,3 +543,18 @@ def test_fit_wood_l_param_to_milk_yield(l_param: float, milk_yield: float, expec
     actual = LactationCurve._fit_wood_l_param_to_milk_yield(l_param, 0.247, 0.003376, milk_yield)
 
     assert pytest.approx(actual) == expected
+
+
+def test_calculate_305_day_milk_yield_error_scalar_and_array() -> None:
+    """Test that _calculate_305_day_milk_yield_error works with both scalar float and np.array([20.0])."""
+    m_param = 0.247
+    n_param = 0.003376
+    target_yield = 10000.0
+
+    error_scalar = LactationCurve._calculate_305_day_milk_yield_error(20.0, m_param, n_param, target_yield)
+    error_array = LactationCurve._calculate_305_day_milk_yield_error(np.array([20.0]), m_param, n_param, target_yield)
+
+    assert isinstance(error_scalar, float)
+    assert isinstance(error_array, float)
+    assert error_scalar == error_array
+
