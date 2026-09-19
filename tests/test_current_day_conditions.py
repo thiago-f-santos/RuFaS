@@ -99,6 +99,31 @@ def test_determine_daylength(
         assert mock_date_conversion.call_count == 0
 
 
+@pytest.mark.parametrize(
+    "day_number,geographic_latitude,expected_min,expected_max,description",
+    [
+        # Northern Hemisphere (Madison, WI: lat +42.4)
+        (172, 42.4, 15.0, 16.0, "Madison Summer Solstice (June) - daylength > 15h"),
+        (355, 42.4, 8.5, 9.5, "Madison Winter Solstice (December) - daylength < 9.5h"),
+        # Southern Hemisphere (Minas Gerais, Brazil: lat -22.5)
+        (172, -22.5, 10.0, 11.0, "Brazil Winter Solstice (June) - daylength < 11.0h"),
+        (355, -22.5, 13.0, 14.0, "Brazil Summer Solstice (December) - daylength > 13.0h"),
+    ],
+)
+def test_determine_daylength_hemispheres(
+    day_number: int,
+    geographic_latitude: float,
+    expected_min: float,
+    expected_max: float,
+    description: str,
+) -> None:
+    """Verifies that signed latitude correctly flips the seasons between North and South hemispheres."""
+    daylength = CurrentDayConditions.determine_daylength(day_number, geographic_latitude, 2024)
+    assert expected_min <= daylength <= expected_max, (
+        f"Failed for {description}: got {daylength}h, expected between {expected_min}h and {expected_max}h"
+    )
+
+
 @pytest.mark.parametrize("day_number", [2, 82, 365])
 def test_calculate_solar_declination_radians(day_number: int) -> None:
     """Tests the calculation of solar declination radians is as expected"""
