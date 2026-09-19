@@ -1,7 +1,5 @@
-import os
-os.environ.pop("DISPLAY", None)
-
 import pytest
+
 from RUFAS.biophysical.field.field.field_data import FieldData
 
 

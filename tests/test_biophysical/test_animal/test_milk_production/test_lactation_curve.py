@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Any
 
+import numpy as np
 import pytest
 from pytest_mock import MockerFixture
 
@@ -351,7 +352,6 @@ def test_set_lactation_parameters_region_code_fallback(mocker: MockerFixture) ->
     )
 
 
-
 @pytest.mark.parametrize(
     "milking_frequency,expected",
     [
@@ -543,3 +543,18 @@ def test_fit_wood_l_param_to_milk_yield(l_param: float, milk_yield: float, expec
     actual = LactationCurve._fit_wood_l_param_to_milk_yield(l_param, 0.247, 0.003376, milk_yield)
 
     assert pytest.approx(actual) == expected
+
+
+def test_calculate_305_day_milk_yield_error_scalar_and_array() -> None:
+    """Test that _calculate_305_day_milk_yield_error works with both scalar float and np.array([20.0])."""
+    m_param = 0.247
+    n_param = 0.003376
+    target_yield = 10000.0
+
+    error_scalar = LactationCurve._calculate_305_day_milk_yield_error(20.0, m_param, n_param, target_yield)
+    error_array = LactationCurve._calculate_305_day_milk_yield_error(np.array([20.0]), m_param, n_param, target_yield)
+
+    assert isinstance(error_scalar, float)
+    assert isinstance(error_array, float)
+    assert error_scalar == error_array
+

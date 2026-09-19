@@ -248,7 +248,6 @@ def test_daily_update_routine_passes_signed_latitude(mocker: MockerFixture):
     mock_weather.get_current_day_conditions.assert_called_once_with(mock_time, -22.5)
 
 
-
 @pytest.mark.parametrize(
     "fields",
     [

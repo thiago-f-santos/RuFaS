@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import pytest
 
 
 def test_schema_properties_passo_1():

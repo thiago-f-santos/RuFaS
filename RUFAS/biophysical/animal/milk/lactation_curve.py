@@ -1,6 +1,7 @@
 from typing import Any
 from warnings import catch_warnings
 
+import numpy as np
 from scipy.optimize import minimize
 
 from RUFAS.biophysical.animal.milk.milk_production import MilkProduction
@@ -201,13 +202,14 @@ class LactationCurve:
         if region_code is None:
             return neutral_adjustments
 
-        if country == "USA":
+        country_code = country.upper() if country else "USA"
+        if country_code == "USA":
             state_fips_code = int(region_code / 1000)
             region = region_mapping.get(str(state_fips_code))
             if region and region in region_adjustment_values:
                 return region_adjustment_values[region]
             return neutral_adjustments
-        elif country == "BRA":
+        elif country_code == "BRA":
             code_str = str(region_code)
             state_ibge_code = int(code_str[:2]) if len(code_str) >= 2 else region_code
             region = region_mapping.get(str(state_ibge_code))
@@ -422,7 +424,7 @@ class LactationCurve:
         Calculate the absolute difference between Wood's-curve-predicted 305-day milk yield
         and a target yield. Used as the objective in fitting Wood's l parameter.
         """
-        l_param = float(l_param[0]) if hasattr(l_param, "__len__") else float(l_param)
+        l_param = float(np.asarray(l_param).item())
         return abs(MilkProduction.calculate_predicted_305_day_milk_yield(l_param, m_param, n_param) - milk_yield)
 
     @classmethod

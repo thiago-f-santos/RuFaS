@@ -121,7 +121,7 @@ O RuFaS Brasil aceita:
 
 1. **Ativar o Ambiente Virtual:**
    ```bash
-   cd /home/thiago/Projects/RuFaS
+   cd /caminho/para/o/RuFaS
    source venv/bin/activate
    ```
 
