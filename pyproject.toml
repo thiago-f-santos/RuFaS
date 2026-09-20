@@ -11,14 +11,14 @@ license = "GPL-3.0-only"
 authors = [
 {"name" = "RuFaS Team", "email" = "contact@rufas.org"},
 ]
-requires-python = ">=3.12, <3.14"
+requires-python = ">=3.12, <3.15"
 dependencies = [
     "matplotlib>=3.10.0",
-    "numpy==2.2.0",
+    "numpy>=2.2.0",
     "pandas>=2.2.3",
     "scipy>=1.15.1",
     "typing_extensions>=4.12.2",
-    "salib==1.5.1",
+    "salib>=1.5.1",
     "tqdm>=4.67.1",
     "deepdiff>=8.2.0",
     "psutil>=6.1.1",
