@@ -34,13 +34,17 @@
     "region_code": {
       "type": "number",
       "description": "Administrative region code (e.g. 5-digit FIPS for USA, 2-digit UF or 7-digit municipality IBGE code for Brazil).",
-      "minimum": 1
+      "minimum": 1,
+      "nullable": true,
+      "default": null
     },
     "FIPS_county_code": {
       "type": "number",
       "minimum": 1000,
       "maximum": 56045,
-      "description": "Unique 5-digit code that represents a specific U.S. county."
+      "description": "Unique 5-digit code that represents a specific U.S. county.",
+      "nullable": true,
+      "default": null
     },
     "include_detailed_values": {
       "type": "bool",

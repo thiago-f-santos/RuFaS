@@ -282,17 +282,32 @@ class EmissionsEstimator:
         try:
             emissions_index = region_codes.index(region_code)
         except ValueError:
-            info_map = {
-                "class": self.__class__.__name__,
-                "function": self._get_feed_emissions_data.__name__,
-            }
-            self.om.add_error(
-                "Invalid country code access.",
-                f"Emission data have {code_column_key}s {region_codes},"
-                f"Tried to get data with {code_column_key}: {region_code}",
-                info_map,
-            )
-            raise
+            if str(region_code).isdigit() and len(str(region_code)) == 7 and int(str(region_code)[:2]) in region_codes:
+                emissions_index = region_codes.index(int(str(region_code)[:2]))
+            elif getattr(self, "country", "USA") == "BRA":
+                info_map = {
+                    "class": self.__class__.__name__,
+                    "function": self._get_feed_emissions_data.__name__,
+                }
+                self.om.add_warning(
+                    "Missing Regional Feed Emissions",
+                    f"Emissions data with {code_column_key}s does not contain region {region_code} for country BRA. "
+                    "Purchased feed emissions will be safely omitted.",
+                    info_map,
+                )
+                return {}
+            else:
+                info_map = {
+                    "class": self.__class__.__name__,
+                    "function": self._get_feed_emissions_data.__name__,
+                }
+                self.om.add_error(
+                    "Invalid country code access.",
+                    f"Emission data have {code_column_key}s {region_codes},"
+                    f"Tried to get data with {code_column_key}: {region_code}",
+                    info_map,
+                )
+                raise
 
         feed_keys = [key for key in feed_emissions_data.keys() if key != code_column_key]
         feed_emissions_dict = {key: feed_emissions_data[key][emissions_index] for key in feed_keys}

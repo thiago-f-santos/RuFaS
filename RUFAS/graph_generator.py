@@ -22,7 +22,10 @@ if "DISPLAY" not in os.environ:
     matplotlib.use("Agg")
 else:
     # Use the 'TkAgg' backend when a display is available
-    matplotlib.use("TkAgg")
+    try:
+        matplotlib.use("TkAgg")
+    except Exception:
+        matplotlib.use("Agg")
 
 FUNCTION_TYPE = Callable[..., Any]
 

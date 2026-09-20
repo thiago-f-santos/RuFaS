@@ -1024,6 +1024,8 @@ class InputManager:
                 valid_data = valid_data and is_element_acceptable
 
                 if is_element_acceptable:
+                    if metadata_property not in input_data:
+                        input_data[metadata_property] = variable_properties.get("default")
                     validated_data[metadata_property] = input_data[metadata_property]
                 elif eager_termination:
                     return False
