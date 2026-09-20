@@ -1,0 +1,10 @@
+{
+    "country": "BRA",
+    "region_code": 3148004,
+    "start_date": "2021:1",
+    "end_date": "2022:365",
+    "set_seed": true,
+    "simulation_type": "full_farm",
+    "nutrient_standard": "NASEM",
+    "include_detailed_values": false
+}
