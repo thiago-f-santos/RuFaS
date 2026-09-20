@@ -1,0 +1,11 @@
+{
+  "files": {
+    "tasks": {
+      "title": "Task manager data",
+      "description": "Configuration file for general simulation parameters.",
+      "path": "input/data/tasks/task_minas_gerais.json",
+      "type": "json",
+      "properties": "tasks_properties"
+    }
+  }
+}
