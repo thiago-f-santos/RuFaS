@@ -4182,6 +4182,13 @@
         "minimum": 0.0
       }
     },
+    "216": {
+      "type": "array",
+      "properties": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
     "229": {
       "type": "array",
       "properties": {
@@ -4323,6 +4330,13 @@
       }
     },
     "251": {
+      "type": "array",
+      "properties": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "301": {
       "type": "array",
       "properties": {
         "type": "number",
