@@ -6,6 +6,7 @@
     "tillage_management_specification": "tillage_schedule_minas_gerais",
     "field_size": 20.0,
     "latitude": -18.5789,
+    "absolute_latitude": 18.5789,
     "longitude": -46.5181,
     "minimum_daylength": 10.8,
     "seasonal_high_water_table": false,

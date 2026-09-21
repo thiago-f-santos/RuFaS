@@ -142,3 +142,33 @@ O RuFaS Brasil aceita:
    - Variáveis diárias exportadas: `output/csv_variables_pool.csv` (ou arquivos particionados por módulo).
    - Diagnósticos e logs: `output/logs/logs.txt` e `output/logs/errors.txt`.
 
+---
+
+## 6. Produção Própria de Forragem e Rotação de Culturas (Minas Gerais)
+
+### 6.1 Realidade da Pecuária Leiteira Tropical
+Em fazendas leiteiras tecnificadas no Brasil (e especialmente em bacias como o Alto Paranaíba e Triângulo Mineiro), a produção própria de volumoso é um pilar econômico e operacional indispensável. A silagem de milho constitui a principal fonte de energia forrageira da dieta, sendo produzida nas áreas de lavoura da própria propriedade e armazenada em silos trincheira (bunker).
+
+### 6.2 Calendário Agrícola e Sazonalidade do Cerrado
+O calendário de cultivo ([`crop_schedule_minas_gerais.json`](../input/data/crop/crop_schedule_minas_gerais.json)) é projetado para explorar o período chuvoso do Cerrado (outubro a abril, precipitação acumulada > 1.200 mm):
+
+| Safra / Ciclo | Janela de Plantio | Janela de Colheita | Duração | Ponto de Corte e Operação |
+|---|---|---|---|---|
+| **Safra de Verão** | 1º de Novembro (Dia 305) | 24 de Fevereiro (Dia 55) | ~115 dias | Grão farináceo-duro (32–35% MS), `harvest_kill` |
+| **Ciclo 1 / Janela Inicial** | 15 de Janeiro (Dia 15) | 25 de Abril (Dia 115) | ~100 dias | Ponto de silagem (35% MS), `harvest_kill` |
+
+- **Produtividade Observada**: Entre 11,4 e 15,0 t MS/ha (33 a 43 t MV/ha), coerente com híbridos de milho adaptados para silagem em Latossolo Vermelho sob boa adubação.
+- **Repetição Multianual**: O padrão utiliza `"pattern_repeat": 1` com `"planting_skip": 0`, assegurando que o milho seja semeado e colhido anualmente de forma contínua em simulações plurianuais.
+
+### 6.3 Armazenamento em Silo Bunker e Dieta do Rebanho
+- **Identificador no RuFaS**: A silagem de milho produzida internamente no campo `field_1` é recebida no silo trincheira `corn_silage_storage_1` sob o **Feed ID 51** (`"Corn silage, mid maturity"`).
+- **Alocação na Dieta ([`feed_minas_gerais.json`](../input/data/feed/feed_minas_gerais.json))**: As rações para novilhas, vacas secas e vacas em lactação utilizam `feed_type: 51`. O [`FeedManager`](../RUFAS/biophysical/feed_storage/feed_manager.py) atende a demanda diária (~715 kg MS/dia) priorizando o estoque do silo da fazenda, recorrendo a compras comerciais apenas como reserva de contingência.
+- **Conservação e Perdas**: O modelo simula perdas de fermentação e gases (~2,3% da MS), mantendo a qualidade de amido (33%), proteína bruta (7,7%) e FDN (41%).
+
+### 6.4 Sincronização da Aplicação de Dejetos ([`manure_schedule_minas_gerais.json`](../input/data/manure_schedule/manure_schedule_minas_gerais.json))
+A fertirrigação / distribuição de esterco líquido é posicionada estrategicamente nas janelas pré-plantio (dias 10 e 300), garantindo:
+1. **Aproveitamento Agronômico de Nutrientes**: O nitrogênio, fósforo e potássio orgânicos e amoniacais são disponibilizados no momento de maior exigência inicial da cultura.
+2. **Eliminação de Deficiências**: O parâmetro `"supplement_manure_nutrient_deficiencies": "synthetic fertilizer and manure"` complementa automaticamente qualquer déficit com adubo mineral, evitando alertas de carência nutricional.
+3. **Mitigação Ambiental**: Evita a aplicação de dejetos em solo descoberto durante a entressafra seca, mitigando perdas por lixiviação de nitratos e emissões desnecessárias de $\text{N}_2\text{O}$.
+
+

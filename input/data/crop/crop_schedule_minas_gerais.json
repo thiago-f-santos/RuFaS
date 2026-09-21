@@ -1,0 +1,28 @@
+{
+  "crop_schedules": [
+    {
+      "crop_species": "corn_silage",
+      "planting_years": [2021],
+      "planting_days": [15],
+      "harvest_years": [2021],
+      "harvest_days": [115],
+      "harvest_operations": ["harvest_kill"],
+      "harvest_type": "scheduled",
+      "pattern_repeat": 0,
+      "planting_skip": 0,
+      "harvesting_skip": 0
+    },
+    {
+      "crop_species": "corn_silage",
+      "planting_years": [2021],
+      "planting_days": [305],
+      "harvest_years": [2022],
+      "harvest_days": [55],
+      "harvest_operations": ["harvest_kill"],
+      "harvest_type": "scheduled",
+      "pattern_repeat": 1,
+      "planting_skip": 0,
+      "harvesting_skip": 0
+    }
+  ]
+}
