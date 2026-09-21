@@ -12,6 +12,7 @@
         "input/metadata/cross_validation/weather_cross_validation.json",
         "input/metadata/cross_validation/feed_storage_cross_validation.json",
         "input/metadata/cross_validation/crop_and_soil_minas_gerais_cross_validation.json",
+        "input/metadata/cross_validation/corn_silage_minas_gerais_cross_validation.json",
         "input/metadata/cross_validation/corn_alf_silage_cross_validation.json"
       ]
     }
