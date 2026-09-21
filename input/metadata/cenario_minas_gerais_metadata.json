@@ -44,29 +44,29 @@
     },
     "economy": {
       "title": "Economy data",
-      "description": "Energy prices used in the EEE module.",
-      "path": "input/data/EEE/default_costs.csv",
+      "description": "Energy prices used in the EEE module for Minas Gerais.",
+      "path": "input/data/EEE/default_costs_minas_gerais.csv",
       "type": "csv",
       "properties": "economic_properties"
     },
     "emission": {
       "title": "Emissions data",
-      "description": "General emission values used in the EEE module.",
-      "path": "input/data/EEE/default_emissions.csv",
+      "description": "General emission values used in the EEE module for Minas Gerais.",
+      "path": "input/data/EEE/default_emissions_minas_gerais.csv",
       "type": "csv",
       "properties": "emissions_properties"
     },
     "purchased_feeds_emissions": {
       "title": "Emissions from purchased feeds",
-      "description": "Purchased feeds emission values used in the EEE module. Missing data interpolated following script in helpful_scripts/emissions_interpolation.",
-      "path": "input/data/EEE/full_feeds_emissions_July2024_interpolated_regional_average.csv",
+      "description": "Purchased feeds emission values for Minas Gerais (GFLI/Embrapa).",
+      "path": "input/data/EEE/purchased_feeds_emissions_minas_gerais.csv",
       "type": "csv",
       "properties": "feed_emissions_properties"
     },
     "purchased_feed_land_use_change_emissions": {
       "title": "Land Use Change emissions from purchased feeds",
-      "description": "Purchased feeds land use change emission values used in the EEE module. Missing data interpolated following script in helpful_scripts/emissions_interpolation.",
-      "path": "input/data/EEE/full_feeds_land_use_change_emissions_July2024_interpolated_regional_average.csv",
+      "description": "Purchased feeds land use change emission values for Minas Gerais (GFLI PAS 2050).",
+      "path": "input/data/EEE/purchased_feed_land_use_change_emissions_minas_gerais.csv",
       "type": "csv",
       "properties": "feed_emissions_properties"
     },
