@@ -1,4 +1,6 @@
+import copy
 from importlib.metadata import PackageNotFoundError, version as get_installed_version
+import json
 import multiprocessing
 import random
 import sys
@@ -102,14 +104,17 @@ class TaskManager:
     def start(
         self,
         metadata_path: Path,
-        verbosity: LogVerbosity | None,
-        exclude_info_maps: bool,
-        output_directory: Path,
-        logs_directory: Path,
-        clear_output_directory: bool,
-        produce_graphics: bool,
-        suppress_log_files: bool,
-        metadata_depth_limit: int,
+        verbosity: LogVerbosity | None = None,
+        exclude_info_maps: bool = False,
+        output_directory: Path = Path("output/"),
+        logs_directory: Path = Path("output/logs"),
+        clear_output_directory: bool = False,
+        produce_graphics: bool = True,
+        suppress_log_files: bool = False,
+        metadata_depth_limit: int | None = None,
+        remote_config_path: Path | None = None,
+        remote_params: dict[str, str] | None = None,
+        force_fetch: bool = False,
     ) -> None:
         """
         Initializes and starts the task management process.
@@ -132,8 +137,14 @@ class TaskManager:
             Whether to produce graphics.
         suppress_log_files : bool
             Whether to write logs from the ``TaskManager`` to output files.
-        metadata_depth_limit : int
+        metadata_depth_limit : int | None
             Override value for maximum metadata properties depth set in ``InputManager``.
+        remote_config_path : Path | None
+            Path to remote configuration JSON file for fetching simulation data over HTTP.
+        remote_params : dict[str, str] | None
+            Dynamic parameter overrides for remote requests in key=value format.
+        force_fetch : bool
+            Force re-fetching of remote data, bypassing local cache.
 
         Raises
         ------
@@ -174,9 +185,27 @@ class TaskManager:
             metadata_path=metadata_path, input_root=Path(""), task_id="TASK MANAGER", cross_validation_file_paths=None
         )
         task_config: dict[str, Any] = self.input_manager.get_data("tasks")
-        for task in task_config.get("tasks", []):
-            filters_path = Path(task["filters_directory"])
-            self.output_manager.validate_filter_content(filters_path)
+        if not isinstance(task_config, dict) or "tasks" not in task_config:
+            if metadata_path and Path(metadata_path).is_file():
+                try:
+                    with open(metadata_path, "r", encoding="utf-8") as f:
+                        raw_meta = json.load(f)
+                    tasks_file_path = None
+                    if "tasks_properties" in raw_meta:
+                        tasks_file_path = Path(raw_meta["tasks_properties"])
+                    elif "files" in raw_meta and "tasks" in raw_meta["files"]:
+                        tasks_file_path = Path(raw_meta["files"]["tasks"]["path"])
+                    if tasks_file_path and tasks_file_path.is_file():
+                        with open(tasks_file_path, "r", encoding="utf-8") as f:
+                            task_config = json.load(f)
+                except Exception:
+                    pass
+        self._task_config_cache = task_config if isinstance(task_config, dict) else {}
+
+        for task in task_config.get("tasks", []) if isinstance(task_config, dict) else []:
+            if "filters_directory" in task:
+                filters_path = Path(task["filters_directory"])
+                self.output_manager.validate_filter_content(filters_path)
 
         if not is_data_valid:
             TaskManager.handle_post_processing(
@@ -194,7 +223,7 @@ class TaskManager:
             )
             raise Exception("Task Manager's input data is invalid.")
 
-        workers: int = task_config["parallel_workers"]
+        workers: int = task_config.get("parallel_workers", 1) if isinstance(task_config, dict) else 1
         self.output_manager.add_log(
             "Task Manager workers", f"Task Manager is going to run {workers} in parallel.", info_map
         )
@@ -213,9 +242,22 @@ class TaskManager:
             info_map,
         )
         for i in range(len(runnable_args)):
-            runnable_args[i]["task_id"] = f"{i + 1}/{len(runnable_args)}"
+            if "task_id" not in runnable_args[i]:
+                runnable_args[i]["task_id"] = f"{i + 1}/{len(runnable_args)}"
+            self._resolve_task_remote_data(
+                runnable_args[i],
+                remote_config_path=remote_config_path,
+                remote_params=remote_params,
+                force_fetch=force_fetch,
+            )
         self._run_tasks(
-            runnable_args, produce_graphics, metadata_depth_limit, workers, metadata_path, output_directory, verbosity
+            runnable_args,
+            produce_graphics,
+            metadata_depth_limit,
+            workers,
+            metadata_path,
+            output_directory,
+            verbosity,
         )
 
         export_input_data_to_csv: bool = task_config.get("export_input_data_to_csv", False)
@@ -397,12 +439,39 @@ class TaskManager:
         parsed_single_run_args: list[dict[str, Any]] = []
         parsed_multi_run_args: list[dict[str, Any]] = []
         task_config: dict[str, Any] = self.input_manager.get_data("tasks")
-        tasks_from_input: list[dict[str, Any]] = task_config.get("tasks")
-        task_manager_metadata_properties = self.input_manager.get_metadata("properties")
-        export_input_data_to_csv = task_config.get("export_input_data_to_csv")
-        input_data_csv_export_path = Path(task_config.get("input_data_csv_export_path"))
-        input_data_csv_import_path = Path(task_config.get("input_data_csv_import_path"))
+        if not isinstance(task_config, dict) or "tasks" not in task_config:
+            if hasattr(self, "_task_config_cache") and self._task_config_cache:
+                task_config = self._task_config_cache
+            else:
+                task_config = {}
+
+        tasks_from_input: list[dict[str, Any]] = task_config.get("tasks", []) if isinstance(task_config, dict) else []
+        task_manager_metadata_properties = (
+            self.input_manager.get_metadata("properties") if hasattr(self.input_manager, "get_metadata") else None
+        )
+        export_input_data_to_csv = task_config.get("export_input_data_to_csv", False)
+        export_path = task_config.get("input_data_csv_export_path")
+        input_data_csv_export_path = Path(export_path) if export_path else Path("")
+        import_path = task_config.get("input_data_csv_import_path")
+        input_data_csv_import_path = Path(import_path) if import_path else Path("")
         for input_task in tasks_from_input:
+            if "args" in input_task:
+                task_args = dict(input_task["args"])
+                raw_type = input_task.get("task_type", task_args.get("task_type", "SIMULATION_SINGLE_RUN"))
+                task_args["task_type"] = TaskType.from_string(raw_type) if isinstance(raw_type, str) else raw_type
+                task_args.setdefault("task_id", input_task.get("task_id", "1"))
+                task_args.setdefault("log_verbosity", "errors")
+                task_args.setdefault("exclude_info_maps", False)
+                task_args.setdefault("chunkification", False)
+                task_args.setdefault("maximum_memory_usage_percent", 0)
+                task_args.setdefault("maximum_memory_usage", 0)
+                task_args.setdefault("save_chunk_threshold_call_count", 0)
+                task_args.setdefault("produce_graphics", False)
+                task_args.setdefault("output_prefix", "Task")
+                task_args.setdefault("logs_directory", Path("output/logs"))
+                parsed_single_run_args.append(task_args)
+                continue
+
             input_task["task_type"] = TaskType.from_string(input_task["task_type"])
             input_task["input_patch"] = None
             input_task["metadata_file_path"] = Path(input_task["metadata_file_path"])
@@ -770,21 +839,34 @@ class TaskManager:
             should_flush_im_pool = (
                 False if task_type in [TaskType.END_TO_END_TESTING, TaskType.UPDATE_E2E_TEST_RESULTS] else True
             )
+            task_verbosity = args.get("log_verbosity")
+            resolved_verbosity = (
+                LogVerbosity(task_verbosity)
+                if task_verbosity is not None and verbosity is None
+                else (verbosity or LogVerbosity.ERRORS)
+            )
             output_manager.run_startup_sequence(
-                verbosity=LogVerbosity(args["log_verbosity"]) if verbosity is None else verbosity,
-                exclude_info_maps=args["exclude_info_maps"],
+                verbosity=resolved_verbosity,
+                exclude_info_maps=args.get("exclude_info_maps", False),
                 output_directory=output_directory,
                 clear_output_directory=False,
-                chunkification=args["chunkification"],
-                max_memory_usage_percent=int(args["maximum_memory_usage_percent"] / workers),
-                max_memory_usage=int(args["maximum_memory_usage"] / workers),
-                save_chunk_threshold_call_count=args["save_chunk_threshold_call_count"],
+                chunkification=args.get("chunkification", False),
+                max_memory_usage_percent=int(args.get("maximum_memory_usage_percent", 0) / workers),
+                max_memory_usage=int(args.get("maximum_memory_usage", 0) / workers),
+                save_chunk_threshold_call_count=args.get("save_chunk_threshold_call_count", 0),
                 variables_file_path=Path(""),
-                output_prefix=args["output_prefix"],
+                output_prefix=args.get("output_prefix", "Task"),
                 task_id=task_id,
                 is_end_to_end_testing_run=is_end_to_end_test,
             )
             input_manager = InputManager(metadata_depth_limit)
+
+            TaskManager._resolve_task_remote_data(
+                args,
+                remote_config_path=args.get("remote_config_path"),
+                remote_params=args.get("remote_params"),
+                force_fetch=args.get("force_fetch", False),
+            )
 
             handler = validation_and_comparison_handlers.get(task_type)
             if handler:
@@ -830,14 +912,15 @@ class TaskManager:
             return None
 
         except Exception as e:
-            output_prefix = args["output_prefix"]
+            output_prefix = args.get("output_prefix", "Task")
             info_map.update(args)
             output_manager.add_error(
                 f"Failed to finish task: {task_id} with output prefix: {output_prefix}",
                 f"Failed to recover from error: {e}; traceback: {traceback.format_exc()}",
                 info_map,
             )
-            output_manager.dump_all_nondata_pools(args["logs_directory"], args["exclude_info_maps"], "block")
+            logs_dir = Path(args.get("logs_directory", output_directory / "logs"))
+            output_manager.dump_all_nondata_pools(logs_dir, args.get("exclude_info_maps", False), "block")
             output_manager.add_log(
                 "Early termination", "Unexpected early termination. Please see logs for details.", info_map
             )
@@ -1095,7 +1178,8 @@ class TaskManager:
             "function": TaskManager.handle_post_processing.__name__,
             "units": MeasurementUnits.UNITLESS,
         }
-        output_manager.add_log("Validation counts", f"{str(input_manager.elements_counter)}", info_map)
+        counter_str = str(getattr(input_manager, "elements_counter", ""))
+        output_manager.add_log("Validation counts", counter_str, info_map)
 
         if args.get("run_eee", False):
             pass
@@ -1296,3 +1380,99 @@ class TaskManager:
 
         task_metadata_properties = args["task_manager_metadata_properties"]
         dca_updater.update_data_collection_app(task_metadata_properties)
+
+    @staticmethod
+    def _resolve_task_remote_data(
+        args: dict[str, Any],
+        remote_config_path: Path | None = None,
+        remote_params: dict[str, str] | None = None,
+        force_fetch: bool = False,
+    ) -> None:
+        """
+        Inspects task metadata for remote sources or applies CLI remote configuration,
+        invoking RemoteDataAdapter.prepare_data() and updating metadata non-destructively.
+        """
+        metadata_file = args.get("metadata_file_path")
+        if not metadata_file:
+            return
+
+        scenario_path = Path(metadata_file)
+        if scenario_path.name.startswith(".runtime_"):
+            return
+
+        scenario_meta: dict[str, Any] = {}
+        if scenario_path.is_file():
+            try:
+                with open(scenario_path, "r", encoding="utf-8") as f:
+                    scenario_meta = json.load(f)
+            except Exception:
+                scenario_meta = {}
+
+        root_remote = scenario_meta.get("remote_source")
+        files_remotes: dict[str, Any] = {}
+        files_dict = scenario_meta.get("files", {})
+        if isinstance(files_dict, dict):
+            for k, v in files_dict.items():
+                if isinstance(v, dict) and "remote_source" in v:
+                    files_remotes[k] = v["remote_source"]
+
+        if not remote_config_path and not root_remote and not files_remotes:
+            return
+
+        from RUFAS.adapters import RemoteDataAdapter
+
+        adapter = RemoteDataAdapter()
+        all_extracted: dict[str, Path] = {}
+        scenario_meta_override: Path | None = None
+
+        if remote_config_path:
+            res = adapter.prepare_data(
+                remote_config_path,
+                param_overrides=remote_params,
+                force_refresh=force_fetch,
+            )
+            all_extracted.update(res.extracted_files)
+            if res.scenario_metadata_path:
+                scenario_meta_override = res.scenario_metadata_path
+
+        if root_remote and not remote_config_path:
+            res = adapter.prepare_data(
+                root_remote,
+                param_overrides=remote_params,
+                force_refresh=force_fetch,
+            )
+            all_extracted.update(res.extracted_files)
+            if res.scenario_metadata_path:
+                scenario_meta_override = res.scenario_metadata_path
+
+        for key, remote_source in files_remotes.items():
+            res = adapter.prepare_data(
+                remote_source,
+                param_overrides=remote_params,
+                force_refresh=force_fetch,
+            )
+            all_extracted.update(res.extracted_files)
+            if res.scenario_metadata_path:
+                scenario_meta_override = res.scenario_metadata_path
+
+        if scenario_meta_override:
+            args["metadata_file_path"] = Path(scenario_meta_override)
+        elif all_extracted:
+            updated_meta = copy.deepcopy(scenario_meta)
+            if "files" not in updated_meta:
+                updated_meta["files"] = {}
+            for key, resolved_path in all_extracted.items():
+                if key in updated_meta["files"]:
+                    if isinstance(updated_meta["files"][key], dict):
+                        updated_meta["files"][key]["path"] = str(resolved_path)
+                    else:
+                        updated_meta["files"][key] = {"path": str(resolved_path)}
+                else:
+                    updated_meta["files"][key] = {"path": str(resolved_path)}
+
+            ephemeral_dir = Path("input/metadata")
+            ephemeral_dir.mkdir(parents=True, exist_ok=True)
+            safe_task_id = str(args.get("task_id", "default")).replace("/", "_")
+            ephemeral_file = ephemeral_dir / f".runtime_{safe_task_id}_metadata.json"
+            ephemeral_file.write_text(json.dumps(updated_meta, indent=2), encoding="utf-8")
+            args["metadata_file_path"] = ephemeral_file

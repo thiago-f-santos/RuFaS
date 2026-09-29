@@ -50,6 +50,9 @@ def test_main_success(
         produce_graphics=True,
         suppress_log_files=True,
         metadata_depth_limit=None,
+        remote_config_path=None,
+        remote_params=None,
+        force_fetch=False,
     )
 
 
@@ -102,7 +105,7 @@ def test_parse_gnu_args(mocker: MockerFixture) -> None:
     actual_args = parse_gnu_args()
 
     # Assert
-    assert mock_add_argument.call_count == 9
+    assert mock_add_argument.call_count == 12
     assert mock_add_argument.call_args_list == [
         mocker.call(
             "-g",
@@ -159,6 +162,22 @@ def test_parse_gnu_args(mocker: MockerFixture) -> None:
             help="Path to the task manager metadata that will determine the tasks run",
             default="input/task_manager_metadata.json",
         ),
+        mocker.call(
+            "--remote-config",
+            help="Path to remote configuration JSON file for fetching simulation data over HTTP",
+            default=None,
+        ),
+        mocker.call(
+            "--remote-param",
+            action="append",
+            help="Dynamic parameter override for remote requests in key=value format (can be specified multiple times)",
+            default=None,
+        ),
+        mocker.call(
+            "--force-fetch",
+            action="store_true",
+            help="Force re-fetching of remote data, bypassing local cache",
+        ),
     ]
     mock_parse_args.assert_called_once()
     assert actual_args == "test_args"
@@ -180,3 +199,43 @@ def test_case_insensitive_argument_action() -> None:
     for argument in arguments:
         assert hasattr(namespace, argument)
         assert getattr(namespace, argument) == value
+
+
+def test_main_with_remote_flags(
+    mock_task_manager: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Verifies that remote configuration flags are parsed and forwarded to TaskManager.start."""
+    mock_instance = mock_task_manager.return_value
+    mock_instance.start.return_value = None
+
+    remote_cfg = tmp_path / "remote.json"
+    test_args = [
+        "program_name",
+        "--remote-config",
+        str(remote_cfg),
+        "--remote-param",
+        "YEAR=2020",
+        "--remote-param",
+        "API_KEY=secret_token",
+        "--force-fetch",
+    ]
+    monkeypatch.setattr(sys, "argv", test_args)
+
+    main()
+
+    mock_instance.start.assert_called_once_with(
+        metadata_path=Path("input/task_manager_metadata.json"),
+        verbosity=None,
+        exclude_info_maps=False,
+        output_directory=Path("output/"),
+        logs_directory=Path("output/logs"),
+        clear_output_directory=False,
+        produce_graphics=True,
+        suppress_log_files=False,
+        metadata_depth_limit=None,
+        remote_config_path=remote_cfg,
+        remote_params={"YEAR": "2020", "API_KEY": "secret_token"},
+        force_fetch=True,
+    )
