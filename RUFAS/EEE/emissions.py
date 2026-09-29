@@ -309,7 +309,11 @@ class EmissionsEstimator:
                 )
                 raise
 
-        feed_keys = [key for key in feed_emissions_data.keys() if key != code_column_key]
+        feed_keys = [
+            key
+            for key in feed_emissions_data.keys()
+            if key != code_column_key and feed_emissions_data[key] is not None
+        ]
         feed_emissions_dict = {key: feed_emissions_data[key][emissions_index] for key in feed_keys}
 
         return feed_emissions_dict
