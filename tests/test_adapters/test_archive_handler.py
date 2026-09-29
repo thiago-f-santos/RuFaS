@@ -289,3 +289,39 @@ def test_extract_tar_directory_member_raises(tmp_path: Path) -> None:
     handler = ArchiveHandler()
     with pytest.raises(ArchiveExtractionError, match="Cannot extract member 'adir' as regular file"):
         handler.unpack_and_map(tar_bytes, mapping, base_dir=tmp_path)
+
+
+def test_extract_tar_broken_symlink_raises(tmp_path: Path) -> None:
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as tf:
+        ti = tarfile.TarInfo(name="broken_symlink.csv")
+        ti.type = tarfile.SYMTYPE
+        ti.linkname = "non_existent_target.csv"
+        tf.addfile(ti)
+    tar_bytes = buffer.getvalue()
+
+    mapping = MappingConfig(
+        type="archive",
+        archive_format="tar",
+        files=[FileMapping(source_path="broken_symlink.csv", destination_path="out.csv")],
+    )
+    handler = ArchiveHandler()
+    with pytest.raises(ArchiveExtractionError):
+        handler.unpack_and_map(tar_bytes, mapping, base_dir=tmp_path)
+
+
+def test_extract_zip_backslash_traversal_blocked(tmp_path: Path) -> None:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr("..\\evil.txt", "malicious payload")
+    zip_bytes = buffer.getvalue()
+
+    mapping = MappingConfig(
+        type="archive",
+        archive_format="zip",
+        files=[FileMapping(source_path="..\\evil.txt", destination_path=str(tmp_path / "evil.txt"))],
+    )
+    handler = ArchiveHandler()
+    with pytest.raises(ArchiveSecurityError, match="traversal"):
+        handler.unpack_and_map(zip_bytes, mapping, base_dir=tmp_path)
+

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from io import BytesIO
-import os
 from pathlib import Path
 import tarfile
 import zipfile
@@ -44,7 +43,7 @@ class ArchiveHandler:
 
         if mapping.type == "direct_file":
             for f in mapping.files:
-                if ".." in Path(f.destination_path).parts:
+                if ".." in Path(f.destination_path.replace("\\", "/")).parts:
                     raise ArchiveSecurityError(
                         f"Path traversal detected in destination path: '{f.destination_path}'"
                     )
@@ -64,19 +63,19 @@ class ArchiveHandler:
             try:
                 with zipfile.ZipFile(BytesIO(data)) as zf:
                     for name in zf.namelist():
-                        if ".." in Path(name).parts:
+                        if ".." in Path(name.replace("\\", "/")).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in archive entry: '{name}'"
                             )
 
                     available_names = set(zf.namelist())
                     for f in mapping.files:
-                        source = f.source_path.lstrip("/")
+                        source = f.source_path.lstrip("/").replace("\\", "/")
                         if ".." in Path(source).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in archive member: '{source}'"
                             )
-                        if ".." in Path(f.destination_path).parts:
+                        if ".." in Path(f.destination_path.replace("\\", "/")).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in destination path: '{f.destination_path}'"
                             )
@@ -110,19 +109,19 @@ class ArchiveHandler:
                 with tarfile.open(fileobj=BytesIO(data), mode=mode) as tf:
                     members = tf.getmembers()
                     for m in members:
-                        if ".." in Path(m.name).parts:
+                        if ".." in Path(m.name.replace("\\", "/")).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in archive entry: '{m.name}'"
                             )
 
                     tar_names = {m.name: m for m in members}
                     for f in mapping.files:
-                        source = f.source_path.lstrip("/")
+                        source = f.source_path.lstrip("/").replace("\\", "/")
                         if ".." in Path(source).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in archive member: '{source}'"
                             )
-                        if ".." in Path(f.destination_path).parts:
+                        if ".." in Path(f.destination_path.replace("\\", "/")).parts:
                             raise ArchiveSecurityError(
                                 f"Path traversal detected in destination path: '{f.destination_path}'"
                             )
@@ -131,6 +130,10 @@ class ArchiveHandler:
                                 f"Archive does not contain mapped source file: '{source}'."
                             )
                         member = tar_names[source]
+                        if not member.isfile():
+                            raise ArchiveExtractionError(
+                                f"Cannot extract member '{source}' as regular file."
+                            )
                         extracted_f = tf.extractfile(member)
                         if extracted_f is None:
                             raise ArchiveExtractionError(
@@ -143,7 +146,7 @@ class ArchiveHandler:
                         dest.write_bytes(extracted_f.read())
                         key = f.metadata_key or source
                         resolved_files[key] = dest
-            except tarfile.TarError as te:
+            except (tarfile.TarError, KeyError) as te:
                 raise ArchiveExtractionError(f"Corrupted or invalid tar archive: {te}") from te
         else:
             raise ArchiveExtractionError(f"Unsupported archive format: '{mapping.archive_format}'")
