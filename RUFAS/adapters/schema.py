@@ -48,8 +48,10 @@ class RemoteConfig:
     version: str = "1.0"
     cache: CacheConfig = field(default_factory=CacheConfig)
 
+_PARAM_PATTERN = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
+
+
 def _interpolate_string(val: str, params: dict[str, str]) -> str:
-    pattern = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
     def replacer(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in params:
@@ -57,7 +59,7 @@ def _interpolate_string(val: str, params: dict[str, str]) -> str:
         if key in os.environ:
             return os.environ[key]
         raise RemoteConfigValidationError(f"Unresolved configuration parameter: '${{{key}}}'")
-    return pattern.sub(replacer, val)
+    return _PARAM_PATTERN.sub(replacer, val)
 
 def _interpolate_obj(obj: Any, params: dict[str, str]) -> Any:
     if isinstance(obj, str):

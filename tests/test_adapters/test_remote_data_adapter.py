@@ -90,11 +90,14 @@ def test_remote_data_adapter_payload_cached_but_destinations_missing(tmp_path: P
     assert not dest.exists()
 
     mock_exec = mocker.patch("RUFAS.adapters.http_client.HttpClient.execute")
+    mock_log = mocker.spy(adapter.output_manager, "add_log")
     # 3. Should read from cached payload without calling HTTP, unpack, and return from_cache=True
     result2 = adapter.prepare_data(config_dict, base_dir=tmp_path)
     assert result2.from_cache is True
     assert dest.is_file()
     mock_exec.assert_not_called()
+    assert any(call[0][0] == "RemoteDataAdapter Re-unpacking Cache" for call in mock_log.call_args_list)
+
 
 
 def test_remote_data_adapter_force_refresh(tmp_path: Path, mocker: MockerFixture) -> None:

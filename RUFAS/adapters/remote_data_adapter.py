@@ -89,6 +89,11 @@ class RemoteDataAdapter:
 
         cached_payload = cache_mgr.get_cached_data(cache_key)
         if cached_payload is not None and not config.cache.force_refresh:
+            self.output_manager.add_log(
+                "RemoteDataAdapter Re-unpacking Cache",
+                f"Re-unpacking cached payload for '{config.name}' (key: {cache_key[:12]}).",
+                info_map,
+            )
             payload = cached_payload
             from_cache = True
         else:

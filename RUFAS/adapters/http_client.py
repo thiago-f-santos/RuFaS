@@ -16,14 +16,16 @@ class HttpClient:
 
         if request.params:
             query_string = urllib.parse.urlencode(request.params)
-            url += f"?{query_string}"
+            url += f"&{query_string}" if "?" in url else f"?{query_string}"
 
         data: bytes | None = None
         headers = dict(request.headers)
         if request.body is not None:
             if isinstance(request.body, (dict, list)):
                 data = json.dumps(request.body).encode("utf-8")
-                headers.setdefault("Content-Type", "application/json")
+                has_content_type = any(k.lower() == "content-type" for k in headers)
+                if not has_content_type:
+                    headers["Content-Type"] = "application/json"
             elif isinstance(request.body, str):
                 data = request.body.encode("utf-8")
             elif isinstance(request.body, bytes):

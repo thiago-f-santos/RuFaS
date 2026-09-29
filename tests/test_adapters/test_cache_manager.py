@@ -82,8 +82,9 @@ def test_cache_force_refresh(tmp_path: Path) -> None:
     dest_file.write_text("content")
     mapping = [FileMapping(source_path="out.csv", destination_path=str(dest_file))]
 
-    # Even though payload and dest exist, force_refresh must return False
+    # Even though payload and dest exist, force_refresh must return False and get_cached_data must return None
     assert cm.are_destinations_present(key, mapping, base_dir=tmp_path) is False
+    assert cm.get_cached_data(key) is None
 
 
 def test_cache_destination_check(tmp_path: Path) -> None:
@@ -169,3 +170,16 @@ def test_cache_invalid_key_traversal(tmp_path: Path) -> None:
         cm.store("../evil_key", b"data")
     with pytest.raises(ValueError, match="Invalid cache key"):
         cm.get_cached_data("/absolute/key")
+
+
+def test_cache_invalid_key_empty_or_dot() -> None:
+    cm = CacheManager()
+    with pytest.raises(ValueError, match="Invalid cache key"):
+        cm.get_cached_data("")
+    with pytest.raises(ValueError, match="Invalid cache key"):
+        cm.get_cached_data(".")
+    with pytest.raises(ValueError, match="Invalid cache key"):
+        cm.store("", b"data")
+    with pytest.raises(ValueError, match="Invalid cache key"):
+        cm.store(".", b"data")
+

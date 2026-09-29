@@ -13,6 +13,8 @@ class CacheManager:
         self.config = cache_config or CacheConfig()
 
     def _validate_key(self, key: str) -> None:
+        if not key or key == ".":
+            raise ValueError(f"Invalid cache key: '{key}'")
         normalized = key.replace("\\", "/")
         if ".." in Path(normalized).parts or Path(normalized).is_absolute() or "/" in normalized:
             raise ValueError(f"Invalid cache key: '{key}'")
@@ -41,7 +43,7 @@ class CacheManager:
         return payload_file
 
     def get_cached_data(self, key: str) -> bytes | None:
-        if not self.config.enabled:
+        if not self.config.enabled or self.config.force_refresh:
             return None
         payload_file = self._get_cache_dir(key) / "payload.bin"
         if payload_file.is_file():

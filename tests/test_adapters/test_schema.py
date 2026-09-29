@@ -21,7 +21,7 @@ from RUFAS.adapters.schema import (
     load_remote_config,
 )
 
-def test_load_remote_config_valid(tmp_path: Path) -> None:
+def test_load_remote_config_valid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_data = {
         "name": "test_service",
         "version": "1.0",
@@ -48,18 +48,15 @@ def test_load_remote_config_valid(tmp_path: Path) -> None:
         },
     }
     overrides = {"YEAR": "2020"}
-    os.environ["API_KEY"] = "secret123"
-    try:
-        config = load_remote_config(config_data, param_overrides=overrides)
-        assert isinstance(config, RemoteConfig)
-        assert config.server.base_url == "https://example.com/api"
-        assert config.server.timeout_seconds == 15
-        assert config.request.endpoint == "/weather/2020"
-        assert config.request.headers["Authorization"] == "Bearer secret123"
-        assert config.mapping.files[0].source_path == "weather.csv"
-        assert config.mapping.files[0].metadata_key == "weather"
-    finally:
-        del os.environ["API_KEY"]
+    monkeypatch.setenv("API_KEY", "secret123")
+    config = load_remote_config(config_data, param_overrides=overrides)
+    assert isinstance(config, RemoteConfig)
+    assert config.server.base_url == "https://example.com/api"
+    assert config.server.timeout_seconds == 15
+    assert config.request.endpoint == "/weather/2020"
+    assert config.request.headers["Authorization"] == "Bearer secret123"
+    assert config.mapping.files[0].source_path == "weather.csv"
+    assert config.mapping.files[0].metadata_key == "weather"
 
 def test_load_remote_config_missing_placeholder_raises() -> None:
     config_data = {

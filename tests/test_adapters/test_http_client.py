@@ -108,3 +108,41 @@ def test_http_client_generic_error_raises_connection_error(mocker: MockerFixture
     request = RequestConfig(endpoint="/data", method="GET")
     with pytest.raises(RemoteDataConnectionError, match="Unexpected network error"):
         client.execute(server, request)
+
+
+def test_http_client_preexisting_query_params(mocker: MockerFixture) -> None:
+    mock_response = BytesIO(b"data")
+    mock_urlopen = mocker.patch("urllib.request.urlopen", return_value=mock_response)
+
+    client = HttpClient()
+    server = ServerConfig(base_url="https://api.example.com")
+    request = RequestConfig(
+        endpoint="/data?existing=1",
+        method="GET",
+        params={"extra": "2"},
+    )
+    result = client.execute(server, request)
+    assert result == b"data"
+
+    req = mock_urlopen.call_args[0][0]
+    assert req.full_url == "https://api.example.com/data?existing=1&extra=2"
+
+
+def test_http_client_lowercase_content_type(mocker: MockerFixture) -> None:
+    mock_response = BytesIO(b"{}")
+    mock_urlopen = mocker.patch("urllib.request.urlopen", return_value=mock_response)
+
+    client = HttpClient()
+    server = ServerConfig(base_url="https://api.example.com")
+    request = RequestConfig(
+        endpoint="/api",
+        method="POST",
+        headers={"content-type": "application/vnd.custom+json"},
+        body={"foo": "bar"},
+    )
+    client.execute(server, request)
+
+    req = mock_urlopen.call_args[0][0]
+    # urllib capitalizes the header name to Content-type
+    assert req.headers["Content-type"] == "application/vnd.custom+json"
+

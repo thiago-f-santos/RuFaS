@@ -53,6 +53,8 @@ class EphemeralZipServer:
         self.server.server_close()
 
 
+@pytest.mark.slow
+@pytest.mark.e2e
 def test_full_remote_weather_simulation_e2e(tmp_path: Path) -> None:
     # 1. Read real temperate weather CSV sample
     real_weather = Path("input/data/weather/example_temperate_weather.csv").read_text(encoding="utf-8")
