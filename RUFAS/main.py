@@ -19,6 +19,13 @@ from RUFAS.task_manager import TaskManager
 
 def main() -> None:
     cmd_arguments = parse_gnu_args(sys.argv[1:])
+    remote_params: dict[str, str] = {}
+    if cmd_arguments.remote_param:
+        for item in cmd_arguments.remote_param:
+            if "=" in item:
+                k, v = item.split("=", 1)
+                remote_params[k.strip()] = v.strip()
+
     try:
         task_manager = TaskManager()
         task_manager.start(
@@ -31,6 +38,9 @@ def main() -> None:
             produce_graphics=not cmd_arguments.no_graphics,
             suppress_log_files=cmd_arguments.suppress_log_files,
             metadata_depth_limit=cmd_arguments.metadata_depth_limit,
+            remote_config_path=Path(cmd_arguments.remote_config) if cmd_arguments.remote_config is not None else None,
+            remote_params=remote_params if remote_params else None,
+            force_fetch=cmd_arguments.force_fetch,
         )
     except Exception as e:
         info_map = {"class": "No caller class", "function": main.__name__}
@@ -120,6 +130,22 @@ def parse_gnu_args(args: Any | None = None) -> argparse.Namespace:
         "--path-to-metadata",
         help="Path to the task manager metadata that will determine the tasks run",
         default="input/task_manager_metadata.json",
+    )
+    parser.add_argument(
+        "--remote-config",
+        help="Path to remote configuration JSON file for fetching simulation data over HTTP",
+        default=None,
+    )
+    parser.add_argument(
+        "--remote-param",
+        action="append",
+        help="Dynamic parameter override for remote requests in key=value format (can be specified multiple times)",
+        default=None,
+    )
+    parser.add_argument(
+        "--force-fetch",
+        action="store_true",
+        help="Force re-fetching of remote data, bypassing local cache",
     )
     return parser.parse_args(args)
 

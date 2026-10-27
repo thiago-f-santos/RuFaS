@@ -1,0 +1,27 @@
+{
+  "name": "wiremock_weather_minas_gerais",
+  "server": {
+    "base_url": "http://localhost:8080",
+    "timeout_seconds": 30
+  },
+  "request": {
+    "endpoint": "/weather/minas-gerais.zip",
+    "method": "GET"
+  },
+  "cache": {
+    "enabled": true,
+    "directory": "input/remote_cache",
+    "force_refresh": false
+  },
+  "mapping": {
+    "type": "archive",
+    "archive_format": "zip",
+    "files": [
+      {
+        "source_path": "weather_minas_gerais.csv",
+        "destination_path": "input/data/weather/downloaded_weather_minas_gerais.csv",
+        "metadata_key": "weather"
+      }
+    ]
+  }
+}

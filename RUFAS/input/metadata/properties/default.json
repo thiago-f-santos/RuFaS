@@ -4184,6 +4184,7 @@
     },
     "216": {
       "type": "array",
+      "nullable": true,
       "properties": {
         "type": "number",
         "minimum": 0.0
@@ -4338,6 +4339,7 @@
     },
     "301": {
       "type": "array",
+      "nullable": true,
       "properties": {
         "type": "number",
         "minimum": 0.0
