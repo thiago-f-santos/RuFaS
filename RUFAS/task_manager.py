@@ -250,7 +250,7 @@ class TaskManager:
                 remote_params=remote_params,
                 force_fetch=force_fetch,
             )
-        self._run_tasks(
+        failed_tasks = self._run_tasks(
             runnable_args,
             produce_graphics,
             metadata_depth_limit,
@@ -280,8 +280,15 @@ class TaskManager:
                 info_map,
             )
             json_output_directory = runnable_args[0]["json_output_directory"]
+            failed_output_prefixes: list[str] = [
+                task["output_prefix"]
+                for task in runnable_args
+                if f"{task['output_prefix']} ({task['task_id']})" in failed_tasks
+            ]
 
-            self.output_manager.summarize_e2e_test_results(json_output_directory, output_prefixes)
+            self.output_manager.summarize_e2e_test_results(
+                json_output_directory, output_prefixes, failed_output_prefixes
+            )
 
         TaskManager.handle_post_processing(
             args={
@@ -680,7 +687,7 @@ class TaskManager:
         metadata_path: Path,
         output_directory: Path,
         verbosity: LogVerbosity | None,
-    ) -> None:
+    ) -> list[str]:
         """
         Runs all single-run tasks, in parallel if a process pool is available.
 
@@ -700,6 +707,11 @@ class TaskManager:
             Directory where task outputs will be written.
         verbosity : LogVerbosity or None
             Log verbosity level for each run.
+
+        Returns
+        -------
+        list[str]
+            The failed tasks, each as ``"{output_prefix} ({task_id})"``. Empty when every task succeeded.
 
         Notes
         -----
@@ -727,6 +739,7 @@ class TaskManager:
             info_map = {"class": TaskManager.__name__, "function": TaskManager._run_tasks.__name__}
             om = OutputManager()
             om.add_error("Task(s) failed", f"Failed task(s) and output prefix are: {failed}", info_map)
+        return failed
 
     @staticmethod
     def call_handler(
@@ -1002,13 +1015,17 @@ class TaskManager:
         produce_graphics: bool,
         should_flush_im_pool: bool,
     ) -> None:
-        """Runs end-to-end testing routine."""
+        """Validates the comparison configuration, then runs the end-to-end testing routine."""
         info_map = {
             "class": TaskManager.__name__,
             "function": TaskManager._handle_end_to_end_testing.__name__,
             "task_id": task_id,
             "produce_graphics": produce_graphics,
         }
+
+        must_change_variables = E2ETestResultsHandler.validate_comparison_configuration(
+            args["output_prefix"], args["convert_variable_table_path"], args["filters_directory"]
+        )
 
         output_manager.add_log("End-to-end testing", "Starting simulation for end-to-end testing.", info_map)
         TaskManager._handle_simulation_engine_run_tasks(
@@ -1025,7 +1042,10 @@ class TaskManager:
         output_manager.flush_pools()
         output_manager.is_first_post_processing = False
         E2ETestResultsHandler.compare_actual_and_expected_test_results(
-            args["json_output_directory"], args["convert_variable_table_path"], args["output_prefix"]
+            args["json_output_directory"],
+            args["convert_variable_table_path"],
+            args["output_prefix"],
+            must_change_variables,
         )
 
         TaskManager.handle_post_processing(
@@ -1047,11 +1067,13 @@ class TaskManager:
         produce_graphics: bool,
         should_flush_im_pool: bool,
     ) -> None:
-        """Generates a new set of end-to-end expected test results."""
+        """Validates the update configuration, then generates a new set of end-to-end expected test results."""
         info_map = {
             "class": TaskManager.__name__,
             "function": TaskManager._handle_update_e2e_test_results.__name__,
         }
+
+        E2ETestResultsHandler.validate_update_configuration(args["output_prefix"], args["filters_directory"])
 
         output_manager.add_log(
             "End-to-end testing", "Generating new set of end-to-end expected test results.", info_map
